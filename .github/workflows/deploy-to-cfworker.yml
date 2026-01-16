@@ -40,13 +40,17 @@ jobs:
           [ -n "${CF_KV_ID:-}" ] || { echo "🔴 错误: 必须设置 'CF_KV_ID' 变量"; exit 1; }
           [ -n "${CF_CRONS:-}" ] || { echo "🔴 错误: 必须设置 'CF_CRONS' 变量"; exit 1; }
 
-          # 把变量转成 sed 安全的 replacement（防止 # / & \ 以及换行把 sed 命令弄断）
+          # 去掉控制字符（换行/回车），避免 TOML 报 control characters
+          CF_KV_ID_CLEAN="$(printf '%s' "$CF_KV_ID" | tr -d '\r\n')"
+          CF_CRONS_CLEAN="$(printf '%s' "$CF_CRONS" | tr -d '\r\n')"
+
+          # sed replacement 转义
           sed_escape_repl () {
-            printf '%s' "$1" | sed -e ':a;N;$!ba' -e 's/[\/&\\]/\\&/g' -e 's/#/\\#/g'
+            printf '%s' "$1" | sed -e 's/[\/&\\]/\\&/g' -e 's/#/\\#/g'
           }
 
-          KV_ESCAPED="$(sed_escape_repl "$CF_KV_ID")"
-          CRON_ESCAPED="$(sed_escape_repl "$CF_CRONS")"
+          KV_ESCAPED="$(sed_escape_repl "$CF_KV_ID_CLEAN")"
+          CRON_ESCAPED="$(sed_escape_repl "$CF_CRONS_CLEAN")"
 
           sed -i "s#{CF_KV_ID}#${KV_ESCAPED}#g" wrangler.toml
           sed -i "s#{CF_CRONS}#${CRON_ESCAPED}#g" wrangler.toml
@@ -59,6 +63,7 @@ jobs:
           cat wrangler.toml
           echo "-------------------"
           echo "worker_name=$WORKER_NAME" >> "$GITHUB_OUTPUT"
+
 
 
       - name: ⚙️ 动态配置 Worker 环境变量
