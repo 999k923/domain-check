@@ -32,21 +32,34 @@ jobs:
       - name: 🆙 更新并安装最新 Wrangler
         run: npm install -g wrangler@latest
 
-      - name: 🔄 替换 wrangler.toml 中的变量
+            - name: 🔄 替换 wrangler.toml 中的变量
         id: config_setup
         run: |
-          [ -n "${CF_KV_ID}" ] || { echo "🔴 错误: 必须设置 'CF_KV_ID' 变量"; exit 1; }  
-          sed -i "s#{CF_KV_ID}#${CF_KV_ID}#g" wrangler.toml
-          sed -i "s#{CF_CRONS}#${CF_CRONS}#g" wrangler.toml
+          set -euo pipefail
 
-          WORKER_NAME=$(grep '^name =' wrangler.toml | awk -F '"' '{print $2}')
+          [ -n "${CF_KV_ID:-}" ] || { echo "🔴 错误: 必须设置 'CF_KV_ID' 变量"; exit 1; }
+          [ -n "${CF_CRONS:-}" ] || { echo "🔴 错误: 必须设置 'CF_CRONS' 变量"; exit 1; }
+
+          # 把变量转成 sed 安全的 replacement（防止 # / & \ 以及换行把 sed 命令弄断）
+          sed_escape_repl () {
+            printf '%s' "$1" | sed -e ':a;N;$!ba' -e 's/[\/&\\]/\\&/g' -e 's/#/\\#/g'
+          }
+
+          KV_ESCAPED="$(sed_escape_repl "$CF_KV_ID")"
+          CRON_ESCAPED="$(sed_escape_repl "$CF_CRONS")"
+
+          sed -i "s#{CF_KV_ID}#${KV_ESCAPED}#g" wrangler.toml
+          sed -i "s#{CF_CRONS}#${CRON_ESCAPED}#g" wrangler.toml
+
+          WORKER_NAME=$(grep -E '^[[:space:]]*name[[:space:]]*=' wrangler.toml | awk -F '"' '{print $2}')
           [ -n "$WORKER_NAME" ] || { echo "🔴 错误: 未能在 wrangler.toml 中找到 'name' 字段"; exit 1; }
 
           echo -e "\n🎉 项目配置信息如下:"
           echo "-------------------"
           cat wrangler.toml
           echo "-------------------"
-          echo "worker_name=$WORKER_NAME" >> $GITHUB_OUTPUT
+          echo "worker_name=$WORKER_NAME" >> "$GITHUB_OUTPUT"
+
 
       - name: ⚙️ 动态配置 Worker 环境变量
         id: dynamic_vars
