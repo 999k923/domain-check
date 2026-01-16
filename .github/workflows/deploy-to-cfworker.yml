@@ -32,7 +32,7 @@ jobs:
       - name: 🆙 更新并安装最新 Wrangler
         run: npm install -g wrangler@latest
 
-            - name: 🔄 替换 wrangler.toml 中的变量
+      - name: 🔄 替换 wrangler.toml 中的变量
         id: config_setup
         run: |
           set -euo pipefail
